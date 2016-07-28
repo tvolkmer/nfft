@@ -17,6 +17,10 @@
  */
 #include "config.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #ifdef HAVE_COMPLEX_H
 #include <complex.h>
 #endif
@@ -469,6 +473,30 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     plhs[0] = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL);
     *((int32_t *)mxGetData(plhs[0])) = nthreads;
 
+    return;
+  }
+  else if(strcmp(cmd,"set_num_threads") == 0)
+  {
+    check_nargs(nrhs,2,"Wrong number of arguments for set_num_threads.");
+    {
+      int i, num_alloc_plans = 0;
+      int nthreads = nfft_mex_get_int(prhs[1],"nfft: Input argument plan must be a scalar.");
+      if (nthreads < 1)
+        mexErrMsgTxt("Input argument nthreads must be positive integer.\n");
+#ifdef _OPENMP
+      for (i = 0; i < PLANS_MAX; i++)
+        if (plans[i] != 0)
+	  num_alloc_plans++;
+
+      if (num_alloc_plans > 0)
+        mexWarnMsgIdAndTxt("nfftmex:set_num_threads", "nfft_set_num_threads was called while %d plans were not finalized. The specified number of threads will *not* have an impact on the internally used FFTW for these plans. Please finalize these plans.", num_alloc_plans);
+
+      omp_set_num_threads(nthreads);
+#else
+      if (nthreads != 1)
+        mexErrMsgTxt("This version was compiled without OpenMP support.\n");
+#endif
+    }
     return;
   }
   else
